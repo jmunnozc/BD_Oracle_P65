@@ -1,0 +1,44 @@
+create or replace PROCEDURE PP_P_COTEJO_AUTORIDADES_201512 (
+vi_codigo_padron  in varchar2, --Codigo del Padron Actual                               vi_documento_sustento in varchar2                            ) AS
+   n_counter number:=0;   
+   n_consecutivo number;   
+   n_counter_proc number:=0;   
+BEGIN    
+  ROLLBACK;          
+  /*update PBP_BENEFICIARIO set FLAG_ESSALUD = null, documento_sustento =null, COMENTARIO_CAMBIO=null 
+  where FLAG_ESSALUD <> vi_codigo_padron and FLAG_ESSALUD is not null;      
+  commit;*/            
+  
+  -- Actualización de la condicion de usuarios en ESSALUD.      
+  begin         
+    dbms_output.put_line('Empiezo el Proceso AUTORIDADES ELECTAS');         
+    for pc_0 in (select b.rowid, b.codigo_tipo_actividad, b.codigo_tipo_condicion, b.codigo_tipo_pensionista, b.codigo_tipo_supervivencia,                             
+                  1 checkeo                      
+                  from TMP_CARGA_AUTORIDADES a inner join pbp_beneficiario b on (a.dni = b.numero_identificacion)                      
+                 ) loop             
+            if pc_0.codigo_tipo_actividad not in (3) then               
+                update pbp_beneficiario               
+                set   codigo_tipo_actividad = 2,                              
+                      codigo_tipo_condicion = 33,                   
+                      codigo_tipo_supervivencia = null,                   
+                      codigo_tipo_pensionista = null,                   
+                      CONSECUTIVO_TERRITORIAL = NULL,                   
+                      CODIGO_USUARIO_MASIVO = 'UMAUTORIDAD',                   
+                      FECHA_REGISTRO_USU_MASIVO = trunc(sysdate),                    
+                      fecha_modificacion = trunc(sysdate),                    
+                      usuario_modificacion = 'UMAUTORIDAD',                   
+                      documento_sustento = vi_documento_sustento,                   
+                      comentario_cambio = comentario_cambio || ' REPORTADO : COTEJO MASIVO AUTORIDADES ELECTAS ' ||vi_codigo_padron,                   
+                      id_flag = 33               
+                  where rowid = pc_0.rowid;                              
+                      if n_counter = 500 then                  
+                        commit;               
+                      end if;               
+                      n_counter := n_counter + 1;          
+                  end if;          
+                  n_counter_proc := n_counter_proc + 1;         
+                end loop;         
+                commit;        
+                dbms_output.put_line('Ya termine de Procesar AUTORIDADES ELECTAS - Procesados : '||n_counter_proc);      
+                end;  
+            END;
