@@ -1,0 +1,59 @@
+create or replace PROCEDURE PP_P_COTEJO_CAJA_PESCADOR(vi_codigo_padron  in varchar2,                                                  								vi_documento_sustento in varchar2) AS
+   	n_counter number:=0;   
+	n_counter_proc number := 0;   
+	n_consecutivo number;   
+	ln_id_listanegra number;   
+	n_fecha_hora varchar2(100);
+BEGIN    
+	ROLLBACK;     
+	select current_timestamp into n_fecha_hora from dual;     
+	dbms_output.put_line('Empiezo el Proceso CAJA PESCADOR ' || n_fecha_hora);       
+	
+	update PBP_BENEFICIARIO set flag_cpescador = null, CODIGO_TIPO_CONDICION = case when codigo_tipo_condicion = 1 then null else codigo_tipo_condicion end     
+	where flag_cpescador <> vi_codigo_padron and flag_cpescador is not null;     
+	commit;      
+	-- Actualización de la condicion de usuarios Caja del Pescador.            
+	
+	begin         
+		for pc_0 in (select b.rowid, vi_codigo_padron checkeo, a.TIPO_PRESTACION COMENTARIO, b.CODIGO_TIPO_ACTIVIDAD, a.NUMERO_DOCUMENTO, b.codigo_beneficiario perope                      
+			     from verificacion_cajapescador a inner join PBP_BENEFICIARIO b                          
+				on ( a.NUMERO_DOCUMENTO = b.NUMERO_IDENTIFICACION and TRIM(a.APELLIDO_PATERNO) = TRIM(b.PRIMER_APELLIDO) and TRIM(a.APELLIDO_MATERNO) = TRIM(b.SEGUNDO_APELLIDO) and TRIM(a.NOMBRES) = TRIM(b.PRIMER_NOMBRE))                      
+			     where a.perope = vi_codigo_padron AND a.ESTADO_ACTIVO = 'SI'                     
+			    ) loop            
+		if pc_0.codigo_tipo_actividad not in (3,11) then               
+			update pbp_beneficiario               
+			set flag_cpescador = pc_0.checkeo,                   
+				codigo_tipo_actividad = 2,                   
+				codigo_tipo_condicion = 36,                   
+				codigo_tipo_supervivencia = null,                   
+				codigo_tipo_pensionista = null,                   
+				CONSECUTIVO_TERRITORIAL = NULL,                   
+				CODIGO_USUARIO_MASIVO = 'UMCPESCADOR',                   
+				FECHA_REGISTRO_USU_MASIVO = trunc(sysdate),                    
+				fecha_modificacion = trunc(sysdate),                    
+				usuario_modificacion = 'UMCPESCADOR',                   
+				documento_sustento = vi_documento_sustento,                   
+				comentario_cambio = comentario_cambio || ' REPORTADO : ' || vi_codigo_padron || ' COTEJO MASIVO CPESCADOR, '|| PC_0.COMENTARIO,                   
+				id_flag = 36               
+			where rowid = pc_0.rowid;                               
+			
+			-- Insertando el Registro en la Lista Negra               
+			SELECT Codigo_lista_negra.nextval INTO ln_id_listanegra FROM dual;               
+			INSERT INTO pb_lista_negra (consecutivo, numero_identificacion, codigo_tipo_condicion, codigo_tip_documento, descripcion_documento, fecha_documento,                                           
+							descripcion_comentario, usuario_registro, fecha_registro, flag_estado, perope)               
+			VALUES (ln_id_listanegra, pc_0.NUMERO_DOCUMENTO, 36, 1, 'COTEJO MASIVO CPESCADOR '||vi_documento_sustento, to_date(sysdate,'dd/mm/yyyy'),                        
+				'REPORTADO : ' || vi_codigo_padron || ' COTEJO MASIVO CPESCADOR ', 'UMCPESCADOR', SYSDATE, 1, pc_0.perope );                               
+				
+				if n_counter = 500 then                  
+					commit;               
+				end if;               
+				n_counter := n_counter + 1;            
+			end if;              
+			n_counter_proc := n_counter_proc + 1;         
+		end loop;         
+		commit;         
+		
+		select current_timestamp into n_fecha_hora from dual;         
+		dbms_output.put_line('Termino del Proceso CAJA PESCADOR - Procesados : '||n_counter_proc || ' - ' || n_fecha_hora);      
+	end;  
+END;
